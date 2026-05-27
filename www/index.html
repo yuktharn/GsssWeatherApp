@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GSSS College Weather</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{height:100%}
+    body{font-family:'Segoe UI',system-ui,Arial,sans-serif;min-height:100vh;color:#fff;overflow-x:hidden;padding-bottom:60px;position:relative}
+
+    /* ═══ REALISTIC SKY BACKGROUND ═══
+       No canvas. No cartoon clouds. Pure CSS layered gradients.
+       3 cloud layers drift at different speeds → natural parallax.
+       JS sets class on #sky (e.g. "cond-clouds") to switch condition. */
+    #sky{position:fixed;inset:0;z-index:0;overflow:hidden;transition:background 3s ease}
+    #sky .sl{position:absolute;inset:-15% -20%;width:140%;height:130%;will-change:transform}
+    #sky .sl-base{inset:0;width:100%;height:100%;transition:background 3s ease}
+    #sky .sl-scrim{position:absolute;inset:0;z-index:10;background:rgba(0,0,0,0.12);pointer-events:none}
+
+    @keyframes driftL{from{transform:translateX(-6%)}to{transform:translateX(6%)}}
+    @keyframes driftR{from{transform:translateX(6%)} to{transform:translateX(-6%)}}
+    @keyframes driftS{from{transform:translateX(-4%)}to{transform:translateX(4%)}}
+    #sky .sl-l1{animation:driftL 90s ease-in-out infinite alternate}
+    #sky .sl-l2{animation:driftR 60s ease-in-out infinite alternate}
+    #sky .sl-l3{animation:driftS 40s ease-in-out infinite alternate}
+
+    #sky .sl-rain{position:absolute;inset:0;background-image:repeating-linear-gradient(172deg,transparent 0px,transparent 3px,rgba(180,205,230,0.06) 3px,rgba(180,205,230,0.06) 4px);background-size:8px 8px;display:none}
+    @keyframes rainFall{from{background-position:0 -200px}to{background-position:0 200px}}
+
+    #sky .sl-snow{position:absolute;inset:0;background-image:radial-gradient(1.5px 1.5px at 10% 25%,rgba(255,255,255,0.55) 0%,transparent 100%),radial-gradient(1px 1px at 30% 15%,rgba(255,255,255,0.45) 0%,transparent 100%),radial-gradient(2px 2px at 55% 35%,rgba(255,255,255,0.40) 0%,transparent 100%),radial-gradient(1.5px 1.5px at 75% 20%,rgba(255,255,255,0.50) 0%,transparent 100%),radial-gradient(1px 1px at 85% 40%,rgba(255,255,255,0.35) 0%,transparent 100%),radial-gradient(2px 2px at 20% 60%,rgba(255,255,255,0.40) 0%,transparent 100%),radial-gradient(1.5px 1.5px at 45% 70%,rgba(255,255,255,0.45) 0%,transparent 100%),radial-gradient(1px 1px at 65% 65%,rgba(255,255,255,0.35) 0%,transparent 100%),radial-gradient(2px 2px at 90% 75%,rgba(255,255,255,0.40) 0%,transparent 100%);background-size:200px 200px;display:none}
+    @keyframes snowFall{from{background-position:0 -200px,20px -180px,0 -160px,30px -200px,0 -170px,15px -190px,0 -150px,25px -180px,0 -200px}to{background-position:30px 200px,50px 210px,10px 220px,60px 200px,40px 215px,45px 205px,20px 225px,55px 210px,30px 200px}}
+
+    #sky .sl-lightning{position:absolute;inset:0;background:rgba(200,215,255,0);display:none}
+    @keyframes lightning{0%,90%,100%{background:rgba(200,215,255,0)}92%{background:rgba(200,215,255,0.14)}94%{background:rgba(200,215,255,0)}96%{background:rgba(200,215,255,0.08)}98%{background:rgba(200,215,255,0)}}
+
+    #sky .sl-sun{position:absolute;width:55%;height:55%;top:-5%;right:5%;background:radial-gradient(circle,rgba(255,230,130,0.22) 0%,rgba(255,190,80,0.12) 35%,rgba(255,150,50,0) 70%);border-radius:50%;display:none}
+
+    /* OVERCAST / CLOUDS — matches the reference photo dark grey atmospheric sky */
+    #sky.cond-clouds .sl-base,#sky.cond-overcast .sl-base{background:linear-gradient(180deg,#111d28 0%,#182636 22%,#1e3045 45%,#253a52 68%,#2c4460 85%,#304a68 100%)}
+    #sky.cond-clouds .sl-l1,#sky.cond-overcast .sl-l1{background:radial-gradient(ellipse 200% 80% at 0% 18%,rgba(205,218,232,0.50) 0%,transparent 52%),radial-gradient(ellipse 170% 70% at 100% 6%,rgba(198,212,228,0.44) 0%,transparent 48%),radial-gradient(ellipse 150% 65% at 48% 42%,rgba(190,205,222,0.40) 0%,transparent 54%),radial-gradient(ellipse 130% 60% at 75% 28%,rgba(185,200,218,0.36) 0%,transparent 50%)}
+    #sky.cond-clouds .sl-l2,#sky.cond-overcast .sl-l2{background:radial-gradient(ellipse 165% 68% at 22% 14%,rgba(192,208,226,0.55) 0%,transparent 52%),radial-gradient(ellipse 140% 58% at 85% 32%,rgba(180,196,216,0.48) 0%,transparent 50%),radial-gradient(ellipse 155% 62% at 52% 58%,rgba(175,192,212,0.44) 0%,transparent 54%)}
+    #sky.cond-clouds .sl-l3,#sky.cond-overcast .sl-l3{background:radial-gradient(ellipse 120% 48% at 12% 48%,rgba(158,176,198,0.52) 0%,transparent 50%),radial-gradient(ellipse 105% 44% at 78% 58%,rgba(148,168,192,0.48) 0%,transparent 48%),radial-gradient(ellipse 115% 46% at 45% 72%,rgba(142,162,186,0.44) 0%,transparent 50%),radial-gradient(ellipse 95% 40% at 90% 40%,rgba(152,170,194,0.40) 0%,transparent 46%)}
+
+    /* CLEAR */
+    #sky.cond-clear .sl-base{background:linear-gradient(180deg,#031840 0%,#0a3580 25%,#1460c0 55%,#2080d8 78%,#38a0e8 100%)}
+    #sky.cond-clear .sl-sun{display:block}
+    #sky.cond-clear .sl-l1{background:radial-gradient(ellipse 140% 55% at 85% 12%,rgba(240,248,255,0.28) 0%,transparent 50%),radial-gradient(ellipse 100% 40% at 18% 22%,rgba(235,245,255,0.22) 0%,transparent 48%)}
+    #sky.cond-clear .sl-l2{background:radial-gradient(ellipse 80% 32% at 60% 18%,rgba(230,242,255,0.20) 0%,transparent 46%)}
+    #sky.cond-clear .sl-l3{background:radial-gradient(ellipse 60% 24% at 35% 28%,rgba(225,240,255,0.15) 0%,transparent 44%)}
+
+    /* RAIN */
+    #sky.cond-rain .sl-base,#sky.cond-drizzle .sl-base{background:linear-gradient(180deg,#060c14 0%,#0a1520 18%,#0e1e30 42%,#121e38 65%,#151e3c 85%,#181e40 100%)}
+    #sky.cond-rain .sl-l1,#sky.cond-drizzle .sl-l1{background:radial-gradient(ellipse 190% 78% at 5% 15%,rgba(142,158,178,0.72) 0%,transparent 52%),radial-gradient(ellipse 160% 68% at 95% 8%,rgba(135,152,172,0.65) 0%,transparent 50%),radial-gradient(ellipse 145% 62% at 50% 40%,rgba(128,146,168,0.60) 0%,transparent 54%)}
+    #sky.cond-rain .sl-l2,#sky.cond-drizzle .sl-l2{background:radial-gradient(ellipse 158% 65% at 28% 12%,rgba(130,148,170,0.75) 0%,transparent 52%),radial-gradient(ellipse 130% 55% at 82% 28%,rgba(122,140,162,0.68) 0%,transparent 50%),radial-gradient(ellipse 148% 60% at 55% 55%,rgba(118,136,158,0.62) 0%,transparent 54%)}
+    #sky.cond-rain .sl-l3,#sky.cond-drizzle .sl-l3{background:radial-gradient(ellipse 115% 46% at 15% 45%,rgba(112,130,152,0.72) 0%,transparent 50%),radial-gradient(ellipse 100% 42% at 75% 55%,rgba(105,124,146,0.68) 0%,transparent 48%),radial-gradient(ellipse 110% 44% at 48% 72%,rgba(100,120,142,0.64) 0%,transparent 50%)}
+    #sky.cond-rain .sl-rain,#sky.cond-drizzle .sl-rain{display:block;animation:rainFall 1.2s linear infinite}
+    #sky.cond-drizzle .sl-rain{opacity:0.5}
+
+    /* THUNDERSTORM */
+    #sky.cond-thunderstorm .sl-base{background:linear-gradient(180deg,#020306 0%,#040508 15%,#05070e 38%,#060814 62%,#070918 82%,#080a1c 100%)}
+    #sky.cond-thunderstorm .sl-l1{background:radial-gradient(ellipse 185% 76% at 8% 14%,rgba(65,72,100,0.85) 0%,transparent 52%),radial-gradient(ellipse 158% 66% at 92% 6%,rgba(58,65,92,0.80) 0%,transparent 50%),radial-gradient(ellipse 140% 60% at 50% 38%,rgba(52,58,85,0.75) 0%,transparent 54%)}
+    #sky.cond-thunderstorm .sl-l2{background:radial-gradient(ellipse 155% 63% at 25% 10%,rgba(60,68,95,0.88) 0%,transparent 52%),radial-gradient(ellipse 128% 54% at 80% 26%,rgba(55,62,88,0.82) 0%,transparent 50%),radial-gradient(ellipse 145% 58% at 52% 52%,rgba(50,56,82,0.76) 0%,transparent 54%)}
+    #sky.cond-thunderstorm .sl-l3{background:radial-gradient(ellipse 112% 44% at 18% 44%,rgba(55,62,90,0.82) 0%,transparent 50%),radial-gradient(ellipse 98% 40% at 72% 54%,rgba(50,56,82,0.78) 0%,transparent 48%),radial-gradient(ellipse 108% 42% at 46% 70%,rgba(45,52,78,0.74) 0%,transparent 50%)}
+    #sky.cond-thunderstorm .sl-rain{display:block;animation:rainFall 0.7s linear infinite;opacity:0.8}
+    #sky.cond-thunderstorm .sl-lightning{display:block;animation:lightning 6s ease-in-out infinite}
+
+    /* SNOW */
+    #sky.cond-snow .sl-base{background:linear-gradient(180deg,#1e2c3a 0%,#283c50 22%,#344e68 45%,#405e78 68%,#4a6e88 85%,#527898 100%)}
+    #sky.cond-snow .sl-l1{background:radial-gradient(ellipse 175% 72% at 8% 16%,rgba(225,232,245,0.55) 0%,transparent 52%),radial-gradient(ellipse 148% 62% at 92% 8%,rgba(218,226,240,0.48) 0%,transparent 50%),radial-gradient(ellipse 135% 58% at 50% 42%,rgba(210,220,236,0.44) 0%,transparent 54%)}
+    #sky.cond-snow .sl-l2{background:radial-gradient(ellipse 148% 60% at 25% 12%,rgba(220,228,242,0.58) 0%,transparent 52%),radial-gradient(ellipse 122% 52% at 80% 28%,rgba(212,222,238,0.52) 0%,transparent 50%)}
+    #sky.cond-snow .sl-l3{background:radial-gradient(ellipse 105% 42% at 18% 46%,rgba(215,224,240,0.52) 0%,transparent 50%),radial-gradient(ellipse 95% 38% at 72% 56%,rgba(208,218,235,0.46) 0%,transparent 48%)}
+    #sky.cond-snow .sl-snow{display:block;animation:snowFall 8s linear infinite}
+
+    /* MIST / FOG */
+    #sky.cond-mist .sl-base,#sky.cond-fog .sl-base{background:linear-gradient(180deg,#1a2228 0%,#242e36 22%,#303c46 45%,#3c4a56 68%,#465462 85%,#4e5e6e 100%)}
+    #sky.cond-mist .sl-l1,#sky.cond-fog .sl-l1{background:radial-gradient(ellipse 210% 90% at 0% 25%,rgba(168,180,198,0.80) 0%,transparent 56%),radial-gradient(ellipse 180% 80% at 100% 10%,rgba(162,175,192,0.75) 0%,transparent 54%),radial-gradient(ellipse 160% 72% at 50% 55%,rgba(155,168,185,0.70) 0%,transparent 56%)}
+    #sky.cond-mist .sl-l2,#sky.cond-fog .sl-l2{background:radial-gradient(ellipse 175% 75% at 30% 15%,rgba(165,178,195,0.82) 0%,transparent 54%),radial-gradient(ellipse 148% 65% at 85% 35%,rgba(158,172,188,0.76) 0%,transparent 52%),radial-gradient(ellipse 162% 70% at 55% 65%,rgba(152,165,182,0.70) 0%,transparent 56%)}
+    #sky.cond-mist .sl-l3,#sky.cond-fog .sl-l3{background:radial-gradient(ellipse 130% 55% at 20% 50%,rgba(158,172,190,0.75) 0%,transparent 52%),radial-gradient(ellipse 118% 50% at 75% 62%,rgba(150,165,182,0.70) 0%,transparent 50%),radial-gradient(ellipse 125% 52% at 50% 78%,rgba(145,160,178,0.65) 0%,transparent 52%)}
+
+    /* HAZE */
+    #sky.cond-haze .sl-base{background:linear-gradient(180deg,#221e0e 0%,#302a14 22%,#40361c 45%,#4e4228 68%,#5a4e35 85%,#635842 100%)}
+    #sky.cond-haze .sl-l1{background:radial-gradient(ellipse 185% 76% at 5% 20%,rgba(192,182,155,0.72) 0%,transparent 54%),radial-gradient(ellipse 155% 65% at 95% 10%,rgba(185,175,148,0.65) 0%,transparent 52%),radial-gradient(ellipse 140% 60% at 50% 45%,rgba(178,168,142,0.60) 0%,transparent 55%)}
+    #sky.cond-haze .sl-l2{background:radial-gradient(ellipse 155% 63% at 28% 14%,rgba(188,178,152,0.75) 0%,transparent 52%),radial-gradient(ellipse 130% 55% at 82% 30%,rgba(180,170,145,0.68) 0%,transparent 50%)}
+    #sky.cond-haze .sl-l3{background:radial-gradient(ellipse 112% 46% at 18% 50%,rgba(182,172,148,0.68) 0%,transparent 50%),radial-gradient(ellipse 100% 42% at 75% 60%,rgba(175,165,140,0.62) 0%,transparent 48%)}
+
+    /* ═══ APP CONTENT ═══ */
+    #app{position:relative;z-index:2;max-width:1100px;margin:0 auto;padding:0 16px}
+    .header{text-align:center;padding:28px 16px 14px}
+    .header h1{font-size:1.85rem;font-weight:800;margin-bottom:8px;text-shadow:0 2px 18px rgba(0,0,0,.65)}
+    .coords-badge{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.24);border-radius:30px;padding:5px 16px;font-size:.78rem;color:rgba(255,255,255,.88)}
+    .cur-card{margin:12px 0;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.20);border-radius:22px;padding:22px 28px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;box-shadow:0 8px 32px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.18)}
+    .cur-left{display:flex;align-items:center;gap:12px}
+    .cur-icon{width:82px;height:82px;filter:drop-shadow(0 4px 16px rgba(0,0,0,.55))}
+    .cur-temp{font-size:5.4rem;font-weight:900;line-height:1;letter-spacing:-3px;text-shadow:0 3px 18px rgba(0,0,0,.45)}
+    .cur-temp span{font-size:2.4rem;font-weight:700;letter-spacing:0}
+    .cur-desc{font-size:1.06rem;text-transform:capitalize;opacity:.94;margin-top:3px}
+    .cur-sub{font-size:.79rem;opacity:.68;margin-top:6px}
+    .cur-right{text-align:right}
+    .clock{font-size:2.65rem;font-weight:700;font-family:'Courier New',monospace;letter-spacing:1px;text-shadow:0 2px 14px rgba(0,0,0,.5)}
+    .date-line{font-size:.83rem;opacity:.76;margin-top:4px}
+    .city-line{font-size:.83rem;opacity:.62}
+    .refresh-note{font-size:.64rem;opacity:.38;margin-top:6px;letter-spacing:.04em}
+    .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 0}
+    @media(max-width:600px){.stats-grid{grid-template-columns:repeat(2,1fr)}.cur-card{flex-direction:column}.cur-right{text-align:left}}
+    .stat-box{background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.17);border-radius:16px;padding:14px 10px;text-align:center;cursor:default;transition:background .2s,transform .2s;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .stat-box:hover{background:rgba(255,255,255,.21);transform:translateY(-1px)}
+    .stat-emoji{font-size:1.45rem;display:block;margin-bottom:4px}
+    .stat-name{font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;opacity:.50;margin-bottom:4px}
+    .stat-val{font-size:.96rem;font-weight:700}
+    .stat-sub{font-size:.65rem;opacity:.55;margin-top:2px}
+    .sec-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.10em;opacity:.50;padding:20px 0 9px}
+    .hourly-wrap{overflow-x:auto;padding-bottom:6px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
+    .hourly-wrap::-webkit-scrollbar{height:4px}
+    .hourly-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:4px}
+    .hourly-inner{display:flex;gap:8px;min-width:max-content}
+    .h-card{background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.17);border-radius:14px;padding:10px 10px 8px;min-width:83px;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;transition:background .2s;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .h-card:hover{background:rgba(255,255,255,.22)}
+    .now-card{background:rgba(255,255,255,.24);border-color:rgba(255,255,255,.45)}
+    .h-card img{width:46px;height:46px}
+    .h-time{font-size:.72rem;opacity:.70;font-family:'Courier New',monospace}
+    .h-deg{font-size:1.1rem;font-weight:800}
+    .h-pop{font-size:.68rem;color:#90caf9}
+    .h-desc{font-size:.62rem;opacity:.62;text-transform:capitalize}
+    .days-list{display:flex;flex-direction:column;gap:8px;margin-bottom:28px}
+    .day-card{background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.17);border-radius:18px;overflow:hidden;cursor:pointer;transition:background .2s;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .day-card:hover{background:rgba(255,255,255,.18)}
+    .day-card.open{border-color:rgba(255,255,255,.40)}
+    .day-top{display:grid;grid-template-columns:120px auto 1fr auto 28px;align-items:center;gap:10px;padding:13px 16px}
+    @media(max-width:500px){.day-top{grid-template-columns:90px auto 1fr auto 20px}}
+    .day-name{font-size:.95rem;font-weight:700}
+    .day-date{font-size:.68rem;opacity:.55;margin-top:1px}
+    .day-icon{width:44px;height:44px}
+    .day-desc-col{font-size:.8rem;opacity:.76;text-transform:capitalize}
+    .day-temps{text-align:right}
+    .day-hi{font-size:.95rem;font-weight:700;display:block}
+    .day-lo{font-size:.8rem;opacity:.55;display:block}
+    .day-pop{font-size:.68rem;color:#90caf9;display:block;margin-top:2px}
+    .day-chevron{font-size:.7rem;opacity:.5;text-align:center;transition:transform .25s}
+    .day-card.open .day-chevron{transform:rotate(180deg)}
+    .day-detail{display:none;border-top:1px solid rgba(255,255,255,.13);padding:14px 16px}
+    .day-card.open .day-detail{display:block}
+    .day-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+    @media(max-width:500px){.day-metrics{grid-template-columns:repeat(2,1fr)}}
+    .dm-box{background:rgba(255,255,255,.08);border-radius:12px;padding:10px 6px;text-align:center}
+    .dm-label{font-size:.58rem;opacity:.45;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+    .dm-val{font-size:.86rem;font-weight:700}
+    .hr-scroll{overflow-x:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+    .hr-scroll::-webkit-scrollbar{height:3px}
+    .hr-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:3px}
+    .hr-inner2{display:flex;gap:7px;min-width:max-content;padding-bottom:4px}
+    .hr-cell{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:7px 9px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:58px}
+    .hr-t{font-size:.62rem;opacity:.55;font-family:'Courier New',monospace}
+    .hr-cell img{width:28px;height:28px}
+    .hr-deg{font-size:.8rem;font-weight:700}
+    .center-msg{text-align:center;padding:80px 20px}
+    .spinner{font-size:3rem;display:inline-block;animation:spin 1.2s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .center-msg p{margin-top:14px;font-size:1rem;opacity:.75}
+    code{background:rgba(255,255,255,.12);padding:1px 6px;border-radius:5px;font-size:.88em}
+    .btn-retry{margin-top:18px;padding:10px 30px;background:#fff;color:#1a3a5e;border:none;border-radius:10px;font-size:.92rem;font-weight:700;cursor:pointer}
+    .footer{text-align:center;font-size:.68rem;opacity:.28;padding:22px 0 10px;letter-spacing:.04em}
+  </style>
+</head>
+<body>
+
+<!-- REALISTIC SKY: base + 3 cloud layers + fx layers -->
+<div id="sky" class="cond-clouds">
+  <div class="sl sl-base"></div>
+  <div class="sl sl-l1"></div>
+  <div class="sl sl-l2"></div>
+  <div class="sl sl-l3"></div>
+  <div class="sl-sun"></div>
+  <div class="sl-rain"></div>
+  <div class="sl-snow"></div>
+  <div class="sl-lightning"></div>
+  <div class="sl-scrim"></div>
+</div>
+
+<div id="app">
+  <div class="center-msg"><div class="spinner">⚙️</div><p>Loading GSSS College weather…</p></div>
+</div>
+
+<script>
+/* CONFIG */
+var API   = "https://gsssweatherapp.onrender.com/api";
+var LAT   = "12.361610068733976", LON = "76.62865027769722";
+var NAME  = "GSSS College", CITY = "Mysuru", STATE = "Karnataka";
+var curData = null, fctData = null, clockTimer = null;
+
+/* SKY CONDITION MAP
+   Maps OpenWeatherMap description → CSS class on #sky */
+var COND_MAP = {
+  "clear sky":"clear",
+  "few clouds":"clouds","scattered clouds":"clouds","broken clouds":"clouds","overcast clouds":"overcast",
+  "light rain":"rain","moderate rain":"rain","heavy intensity rain":"rain","very heavy rain":"rain",
+  "extreme rain":"rain","freezing rain":"rain","light intensity shower rain":"rain",
+  "shower rain":"rain","heavy intensity shower rain":"rain","ragged shower rain":"rain",
+  "light intensity drizzle":"drizzle","drizzle":"drizzle","heavy intensity drizzle":"drizzle",
+  "light intensity drizzle rain":"drizzle","drizzle rain":"drizzle","heavy intensity drizzle rain":"drizzle",
+  "shower rain and drizzle":"drizzle",
+  "thunderstorm with light rain":"thunderstorm","thunderstorm with rain":"thunderstorm",
+  "thunderstorm with heavy rain":"thunderstorm","light thunderstorm":"thunderstorm",
+  "thunderstorm":"thunderstorm","heavy thunderstorm":"thunderstorm","ragged thunderstorm":"thunderstorm",
+  "light snow":"snow","snow":"snow","heavy snow":"snow","sleet":"snow",
+  "light shower sleet":"snow","shower sleet":"snow","light rain and snow":"snow","rain and snow":"snow",
+  "light shower snow":"snow","shower snow":"snow","heavy shower snow":"snow",
+  "mist":"mist","smoke":"mist","fog":"fog",
+  "haze":"haze","sand/dust whirls":"haze","sand":"haze","dust":"haze","volcanic ash":"haze",
+  "squalls":"clouds","tornado":"thunderstorm",
+};
+
+function setSkyCondition(description) {
+  var key  = (description || "").toLowerCase();
+  var cond = COND_MAP[key] || COND_MAP[key.split(" ")[0]] || "clouds";
+  document.getElementById("sky").className = "cond-" + cond;
+}
+
+/* FETCH — backend handles all MongoDB caching */
+loadWeather();
+setInterval(loadWeather, 5 * 60 * 1000);
+
+function loadWeather() {
+  Promise.all([
+    fetch(API + "/weather/current").then(function(r) { if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); }),
+    fetch(API + "/weather/forecast").then(function(r) { if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+  ])
+  .then(function(res) { curData=res[0]; fctData=res[1]; renderAll(); })
+  .catch(function(err) {
+    document.getElementById("app").innerHTML =
+      '<div class="center-msg"><div style="font-size:2.5rem">⚠️</div>'
+      +'<p style="font-size:1.1rem;font-weight:700;margin-top:10px">Could not load weather data</p>'
+      +'<p style="opacity:.65;font-size:.85rem;max-width:380px;margin:8px auto 0">'+err.message+'</p>'
+      +'<p style="opacity:.45;font-size:.78rem;max-width:380px;margin:6px auto 0">'
+      +'Make sure the backend is running:<br><code>cd backend &amp;&amp; node server.js</code></p>'
+      +'<button class="btn-retry" onclick="loadWeather()">↻ Retry</button></div>';
+  });
+}
+
+/* HELPERS */
+function rnd(v){return Math.round(v);}
+function ico(c){return"https://openweathermap.org/img/wn/"+c+"@2x.png";}
+function icoS(c){return"https://openweathermap.org/img/wn/"+c+".png";}
+function ist(u,o){var b={timeZone:"Asia/Kolkata"};if(o)Object.assign(b,o);return new Date(u*1000).toLocaleString("en-IN",b);}
+function fmtTime(u){return ist(u,{hour:"2-digit",minute:"2-digit",hour12:true});}
+function fmtHour(u){return ist(u,{hour:"2-digit",minute:"2-digit",hour12:true});}
+function windDir(d){return["N","NE","E","SE","S","SW","W","NW"][Math.round(d/45)%8];}
+function dewPoint(t,h){return rnd(t-(100-h)/5);}
+
+function groupByDay(list){
+  var days=[],seen={};
+  for(var i=0;i<list.length;i++){
+    var k=ist(list[i].dt,{day:"2-digit",month:"2-digit",year:"numeric"});
+    if(!seen[k]){seen[k]=true;days.push({key:k,items:[]});}
+    days[days.length-1].items.push(list[i]);
+  }
+  return days;
+}
+function dayStats(items){
+  var mn=Infinity,mx=-Infinity,sh=0,sw=0,sp=0,mp=0,cc={};
+  for(var i=0;i<items.length;i++){
+    var it=items[i];
+    if(it.main.temp_min<mn)mn=it.main.temp_min;
+    if(it.main.temp_max>mx)mx=it.main.temp_max;
+    sh+=it.main.humidity;sw+=it.wind.speed;sp+=it.main.pressure;
+    var p=it.pop||0;if(p>mp)mp=p;
+    var c=it.weather[0].main;cc[c]=(cc[c]||0)+1;
+  }
+  var n=items.length,avg=items.reduce(function(s,i){return s+i.main.temp;},0)/n;
+  var dc=items[0].weather[0].main,di=items[0].weather[0].icon,dd=items[0].weather[0].description,mc=0;
+  for(var k in cc){if(cc[k]>mc){mc=cc[k];dc=k;}}
+  for(var j=0;j<items.length;j++){if(items[j].weather[0].main===dc){di=items[j].weather[0].icon;dd=items[j].weather[0].description;break;}}
+  return{minT:mn,maxT:mx,avgTemp:avg,humidity:rnd(sh/n),wind:Math.round(sw/n*10)/10,pressure:rnd(sp/n),pop:rnd(mp*100),icon:di,desc:dd};
+}
+function dayLabel(dt,idx){if(idx===0)return"Today";if(idx===1)return"Tomorrow";return ist(dt,{weekday:"short"});}
+function dayDateSub(dt){return ist(dt,{weekday:"short"})+" · "+ist(dt,{day:"numeric",month:"short"});}
+function sb(em,lb,val,sub){return'<div class="stat-box"><span class="stat-emoji">'+em+'</span><div class="stat-name">'+lb+'</div><div class="stat-val">'+val+'</div>'+(sub?'<div class="stat-sub">'+sub+'</div>':'')+'</div>';}
+
+/* RENDER */
+function renderAll(){
+  var cur=curData,fl=fctData.list;
+  setSkyCondition(cur.weather[0].description);
+  var days=groupByDay(fl),today=dayStats(days[0].items);
+
+  var hh='<div class="h-card now-card"><span class="h-time">Now</span><img src="'+ico(cur.weather[0].icon)+'" alt=""/><span class="h-deg">'+rnd(cur.main.temp)+'°C</span><span class="h-desc">'+cur.weather[0].description+'</span></div>';
+  for(var i=0;i<Math.min(fl.length,8);i++){
+    var h=fl[i],pp=(h.pop&&h.pop>0)?'<span class="h-pop">💧 '+rnd(h.pop*100)+'%</span>':'';
+    hh+='<div class="h-card"><span class="h-time">'+fmtHour(h.dt)+'</span><img src="'+ico(h.weather[0].icon)+'" alt=""/><span class="h-deg">'+rnd(h.main.temp)+'°C</span>'+pp+'<span class="h-desc">'+h.weather[0].description+'</span></div>';
+  }
+  var dh="";
+  for(var d=0;d<Math.min(days.length,5);d++)dh+=buildDayCard(days[d],d);
+
+  document.getElementById("app").innerHTML=
+    '<div class="header"><h1>🎓 GSSSIETW </h1>'
+    +'<span class="coords-badge">📍 Lat: '+LAT+' · Lon: '+LON+' &nbsp;|&nbsp; '+CITY+', '+STATE+'</span></div>'
+    +'<div class="cur-card"><div class="cur-left"><img src="'+ico(cur.weather[0].icon)+'" alt="" class="cur-icon"/><div>'
+    +'<div class="cur-temp">'+rnd(cur.main.temp)+'<span>°C</span></div>'
+    +'<div class="cur-desc">'+cur.weather[0].description+'</div>'
+    +'<div class="cur-sub">Feels like '+rnd(cur.main.feels_like)+'°C &nbsp;|&nbsp; H: '+rnd(today.maxT)+'° &nbsp;L: '+rnd(today.minT)+'°</div>'
+    +'</div></div><div class="cur-right">'
+    +'<div class="clock" id="liveClock">--:-- --</div>'
+    +'<div class="date-line" id="liveDate">--</div>'
+    +'<div class="city-line">'+CITY+', '+STATE+'</div>'
+    +'<div class="refresh-note">Auto-refreshes every 5 min</div></div></div>'
+    +'<div class="stats-grid">'
+    +sb("💧","Humidity",cur.main.humidity+"%","")
+    +sb("🌬️","Wind",cur.wind.speed+" m/s",windDir(cur.wind.deg)+(cur.wind.gust?" · Gust "+cur.wind.gust.toFixed(1):""))
+    +sb("👁️","Visibility",(cur.visibility/1000).toFixed(1)+" km","")
+    +sb("🔵","Pressure",cur.main.pressure+" hPa","")
+    +sb("☁️","Clouds",cur.clouds.all+"%","")
+    +sb("💦","Dew Point",dewPoint(cur.main.temp,cur.main.humidity)+"°C","")
+    +sb("🌅","Sunrise",fmtTime(cur.sys.sunrise),"")
+    +sb("🌇","Sunset",fmtTime(cur.sys.sunset),"")
+    +'</div>'
+    +'<div class="sec-title">⏱ NEXT 24 HOURS — PER HOUR</div>'
+    +'<div class="hourly-wrap"><div class="hourly-inner">'+hh+'</div></div>'
+    +'<div class="sec-title">📅 5-DAY FORECAST — TAP A DAY FOR DETAILS</div>'
+    +'<div class="days-list">'+dh+'</div>'
+    +'<div class="footer">GSSS College Weather Dashboard</div>';
+
+  document.querySelectorAll(".day-card").forEach(function(card){
+    card.addEventListener("click",function(){
+      var open=card.classList.contains("open");
+      document.querySelectorAll(".day-card").forEach(function(c){c.classList.remove("open");});
+      if(!open)card.classList.add("open");
+    });
+  });
+  startClock();
+}
+
+function buildDayCard(dayObj,idx){
+  var st=dayStats(dayObj.items),pl=st.pop>0?'<div class="day-pop">💧 '+st.pop+'%</div>':'',cells="";
+  for(var i=0;i<dayObj.items.length;i++){
+    var h=dayObj.items[i];
+    cells+='<div class="hr-cell"><span class="hr-t">'+fmtHour(h.dt)+'</span><img src="'+icoS(h.weather[0].icon)+'" alt=""/><span class="hr-deg">'+rnd(h.main.temp)+'°</span></div>';
+  }
+  return'<div class="day-card"><div class="day-top">'
+    +'<div><div class="day-name">'+dayLabel(dayObj.items[0].dt,idx)+'</div>'
+    +'<div class="day-date">'+dayDateSub(dayObj.items[0].dt)+'</div></div>'
+    +'<img src="'+ico(st.icon)+'" alt="" class="day-icon"/>'
+    +'<div class="day-desc-col">'+st.desc+'</div>'
+    +'<div class="day-temps"><span class="day-hi">'+rnd(st.maxT)+'°C</span>'
+    +'<span class="day-lo">'+rnd(st.minT)+'°C</span>'+pl+'</div>'
+    +'<span class="day-chevron">▼</span></div>'
+    +'<div class="day-detail"><div class="day-metrics">'
+    +'<div class="dm-box"><div class="dm-label">Avg Temp</div><div class="dm-val">'+rnd(st.avgTemp)+'°C</div></div>'
+    +'<div class="dm-box"><div class="dm-label">Humidity</div><div class="dm-val">'+st.humidity+'%</div></div>'
+    +'<div class="dm-box"><div class="dm-label">Wind</div><div class="dm-val">'+st.wind+' m/s</div></div>'
+    +'<div class="dm-box"><div class="dm-label">Pressure</div><div class="dm-val">'+st.pressure+' hPa</div></div>'
+    +'</div><div class="hr-scroll"><div class="hr-inner2">'+cells+'</div></div></div></div>';
+}
+
+function startClock(){if(clockTimer)clearInterval(clockTimer);tick();clockTimer=setInterval(tick,1000);}
+function tick(){
+  var now=new Date(),o={timeZone:"Asia/Kolkata"};
+  var clk=document.getElementById("liveClock"),dt=document.getElementById("liveDate");
+  if(clk)clk.textContent=now.toLocaleTimeString("en-IN",Object.assign({},o,{hour12:true,hour:"2-digit",minute:"2-digit",second:"2-digit"}));
+  if(dt)dt.textContent=now.toLocaleDateString("en-IN",Object.assign({},o,{weekday:"long",day:"numeric",month:"long",year:"numeric"}));
+}
+</script>
+</body>
+</html>
